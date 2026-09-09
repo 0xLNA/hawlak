@@ -3,3 +3,8 @@ node_modules
 .vercel
 *.log
 .DS_Store
+*.tsbuildinfo
+/test-results/
+/playwright-report/
+/data/*.raw.json
+/data/runtime/

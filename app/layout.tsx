@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "حولك | اكتشف المكان المناسب لك",
-  description: "خريطة ذكية لاكتشاف الوجهات القريبة وفهم تجربة الزوار.",
+  description: "وش ودك اليوم؟ اختر نوع طلعتك واستكشف أماكن الرياض على الخريطة ببيانات مفتوحة، وشارك تجربتك مع حولك.",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

@@ -1,0 +1,248 @@
+{
+  "source": "OpenStreetMap contributors",
+  "license": "ODbL-1.0",
+  "licenseUrl": "https://www.openstreetmap.org/copyright",
+  "endpoint": "https://overpass-api.de/api/interpreter",
+  "query": "[out:json][timeout:15];(node[amenity~\"cafe|restaurant\"][name](24.68,46.68,24.70,46.70);node[shop~\"pastry|confectionery\"][name](24.63,46.65,24.73,46.75);way[leisure=park][name](24.63,46.65,24.73,46.75);nwr[tourism=museum][name](24.63,46.65,24.73,46.75););out center 50;",
+  "retrievedAt": "2026-09-09",
+  "osmBaseTimestamp": "2026-09-09T20:17:10Z",
+  "places": [
+    {
+      "id": "osm-node-672714900",
+      "name": "Kudu",
+      "category": "restaurant",
+      "latitude": 24.6898413,
+      "longitude": 46.6864482,
+      "cuisine": "regional",
+      "metadataSource": {
+        "type": "openstreetmap",
+        "url": "https://www.openstreetmap.org/node/672714900",
+        "retrievedAt": "2026-09-09"
+      }
+    },
+    {
+      "id": "osm-node-672714902",
+      "name": "إيرث كافيه",
+      "nameEn": "Urth Caffe",
+      "category": "cafe",
+      "latitude": 24.6896464,
+      "longitude": 46.6863087,
+      "openingHours": "Fr 13:00-24:00; Mo-Th,Sa-Su 08:00-24:00",
+      "metadataSource": {
+        "type": "openstreetmap",
+        "url": "https://www.openstreetmap.org/node/672714902",
+        "retrievedAt": "2026-09-09"
+      }
+    },
+    {
+      "id": "osm-node-673066536",
+      "name": "Starbucks",
+      "category": "cafe",
+      "latitude": 24.6930778,
+      "longitude": 46.6948692,
+      "metadataSource": {
+        "type": "openstreetmap",
+        "url": "https://www.openstreetmap.org/node/673066536",
+        "retrievedAt": "2026-09-09"
+      }
+    },
+    {
+      "id": "osm-node-673578529",
+      "name": "Steak House",
+      "category": "restaurant",
+      "latitude": 24.6937435,
+      "longitude": 46.6977074,
+      "metadataSource": {
+        "type": "openstreetmap",
+        "url": "https://www.openstreetmap.org/node/673578529",
+        "retrievedAt": "2026-09-09"
+      }
+    },
+    {
+      "id": "osm-node-673591207",
+      "name": "Chinese restaurant",
+      "category": "restaurant",
+      "latitude": 24.6941334,
+      "longitude": 46.6852727,
+      "metadataSource": {
+        "type": "openstreetmap",
+        "url": "https://www.openstreetmap.org/node/673591207",
+        "retrievedAt": "2026-09-09"
+      }
+    },
+    {
+      "id": "osm-node-673591227",
+      "name": "Pizza Hut",
+      "category": "restaurant",
+      "latitude": 24.6878167,
+      "longitude": 46.6878047,
+      "metadataSource": {
+        "type": "openstreetmap",
+        "url": "https://www.openstreetmap.org/node/673591227",
+        "retrievedAt": "2026-09-09"
+      }
+    },
+    {
+      "id": "osm-node-2429936990",
+      "name": "Al Karama pastry",
+      "category": "dessert",
+      "latitude": 24.6695205,
+      "longitude": 46.7319689,
+      "metadataSource": {
+        "type": "openstreetmap",
+        "url": "https://www.openstreetmap.org/node/2429936990",
+        "retrievedAt": "2026-09-09"
+      }
+    },
+    {
+      "id": "osm-node-2530465471",
+      "name": "جافا تايم",
+      "nameEn": "Java Time",
+      "category": "cafe",
+      "latitude": 24.6828568,
+      "longitude": 46.69716,
+      "address": "King Fahad Rd، الرياض",
+      "cuisine": "coffee_shop",
+      "metadataSource": {
+        "type": "openstreetmap",
+        "url": "https://www.openstreetmap.org/node/2530465471",
+        "retrievedAt": "2026-09-09"
+      }
+    },
+    {
+      "id": "osm-node-4142843991",
+      "name": "الحناكي للمكسرات",
+      "category": "dessert",
+      "latitude": 24.6384747,
+      "longitude": 46.7101816,
+      "metadataSource": {
+        "type": "openstreetmap",
+        "url": "https://www.openstreetmap.org/node/4142843991",
+        "retrievedAt": "2026-09-09"
+      }
+    },
+    {
+      "id": "osm-node-4142847091",
+      "name": "ايس كريم",
+      "category": "dessert",
+      "latitude": 24.6395555,
+      "longitude": 46.7083483,
+      "metadataSource": {
+        "type": "openstreetmap",
+        "url": "https://www.openstreetmap.org/node/4142847091",
+        "retrievedAt": "2026-09-09"
+      }
+    },
+    {
+      "id": "osm-node-6373495689",
+      "name": "أنواع القهوة",
+      "nameEn": "Tutti Cafe",
+      "category": "cafe",
+      "latitude": 24.6974749,
+      "longitude": 46.6872919,
+      "metadataSource": {
+        "type": "openstreetmap",
+        "url": "https://www.openstreetmap.org/node/6373495689",
+        "retrievedAt": "2026-09-09"
+      }
+    },
+    {
+      "id": "osm-node-8186701879",
+      "name": "القصر الأحمر",
+      "category": "activity",
+      "latitude": 24.6428435,
+      "longitude": 46.709801,
+      "metadataSource": {
+        "type": "openstreetmap",
+        "url": "https://www.openstreetmap.org/node/8186701879",
+        "retrievedAt": "2026-09-09"
+      }
+    },
+    {
+      "id": "osm-node-10264097009",
+      "name": "The Palace Museum",
+      "category": "activity",
+      "latitude": 24.6584815,
+      "longitude": 46.6702334,
+      "metadataSource": {
+        "type": "openstreetmap",
+        "url": "https://www.openstreetmap.org/node/10264097009",
+        "retrievedAt": "2026-09-09"
+      }
+    },
+    {
+      "id": "osm-node-12032959681",
+      "name": "LAS Cafe",
+      "category": "cafe",
+      "latitude": 24.6962967,
+      "longitude": 46.684199,
+      "metadataSource": {
+        "type": "openstreetmap",
+        "url": "https://www.openstreetmap.org/node/12032959681",
+        "retrievedAt": "2026-09-09"
+      }
+    },
+    {
+      "id": "osm-node-12032959682",
+      "name": "Foam",
+      "category": "cafe",
+      "latitude": 24.696121,
+      "longitude": 46.6842887,
+      "metadataSource": {
+        "type": "openstreetmap",
+        "url": "https://www.openstreetmap.org/node/12032959682",
+        "retrievedAt": "2026-09-09"
+      }
+    },
+    {
+      "id": "osm-way-41422552",
+      "name": "حديقة الفوطة",
+      "nameEn": "Al Futah Park",
+      "category": "walk",
+      "latitude": 24.6397246,
+      "longitude": 46.7091517,
+      "metadataSource": {
+        "type": "openstreetmap",
+        "url": "https://www.openstreetmap.org/way/41422552",
+        "retrievedAt": "2026-09-09"
+      }
+    },
+    {
+      "id": "osm-way-53156203",
+      "name": "حديقة الورود",
+      "category": "walk",
+      "latitude": 24.7189529,
+      "longitude": 46.6763564,
+      "metadataSource": {
+        "type": "openstreetmap",
+        "url": "https://www.openstreetmap.org/way/53156203",
+        "retrievedAt": "2026-09-09"
+      }
+    },
+    {
+      "id": "osm-way-53156796",
+      "name": "King Fahad Library Park",
+      "nameEn": "King Fahad Library Park",
+      "category": "walk",
+      "latitude": 24.6862158,
+      "longitude": 46.6878724,
+      "metadataSource": {
+        "type": "openstreetmap",
+        "url": "https://www.openstreetmap.org/way/53156796",
+        "retrievedAt": "2026-09-09"
+      }
+    },
+    {
+      "id": "osm-way-53157804",
+      "name": "حديقة جبل أبو مخروق",
+      "category": "walk",
+      "latitude": 24.67339,
+      "longitude": 46.725696,
+      "metadataSource": {
+        "type": "openstreetmap",
+        "url": "https://www.openstreetmap.org/way/53157804",
+        "retrievedAt": "2026-09-09"
+      }
+    }
+  ]
+}
