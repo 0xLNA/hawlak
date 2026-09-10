@@ -15,7 +15,7 @@ export async function POST(request: Request) {
 
     if (!input) {
       return NextResponse.json(
-        { error: "اكتب تجربة بين 10 و3000 حرف لمكان محدد." },
+        { error: "اكتب تجربة بين 10 و500 حرف لمكان محدد." },
         { status: 400 }
       );
     }
@@ -64,7 +64,7 @@ export async function POST(request: Request) {
           placeId: experience.placeId,
           createdAt: experience.createdAt,
           processed: false,
-          warning: "تم حفظ التجربة، لكن تعذر تحليلها حاليًا.",
+          message: "تم حفظ تجربتك. شكرًا لمشاركتك.",
         },
         { status: 201 }
       );

@@ -1,4 +1,4 @@
-import OpenAI from "openai";
+import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 
 const insightSchema = z.object({
@@ -19,33 +19,34 @@ function normalize(values: string[]) {
 export async function extractReviewInsights(
   rawText: string
 ): Promise<ExtractedReviewInsights> {
-  const apiKey = process.env.OPENAI_API_KEY;
+  const apiKey = process.env.ANTHROPIC_API_KEY;
 
   if (!apiKey) {
-    throw new Error("OPENAI_API_KEY is missing.");
+    throw new Error("ANTHROPIC_API_KEY is missing.");
   }
 
-  const client = new OpenAI({ apiKey });
+  const client = new Anthropic({
+    apiKey,
+  });
 
-  const response = await client.responses.create({
-    model: "gpt-5.6-luna",
-    reasoning: {
-      effort: "none",
-    },
-    input: [
-      {
-        role: "system",
-        content: `
-You extract structured place insights from Arabic or English user reviews.
+  const response = await client.messages.create({
+    model: "claude-sonnet-5",
+    max_tokens: 600,
+
+    system: `
+You extract structured place insights from Arabic or English user experiences.
+
+Use ONLY information explicitly supported by the text.
 
 Rules:
-- Use ONLY information explicitly supported by the review.
-- Never guess or invent.
-- Return valid JSON only.
-- Keep tags short and in English snake_case.
-- If a category is not supported, return an empty array.
-- Do not treat absence of praise as a complaint.
-- Do not classify something unless the text provides evidence.
+- Never guess.
+- Never invent.
+- Return JSON only.
+- Do not include markdown.
+- Use short English snake_case tags.
+- If there is no evidence for a category, return an empty array.
+- Do not classify absence of praise as a complaint.
+- Preserve meaning rather than translating literally.
 
 Return exactly this shape:
 
@@ -58,7 +59,7 @@ Return exactly this shape:
   "timeContext": []
 }
 
-Examples of acceptable tags:
+Examples:
 
 vibe:
 quiet, calm, lively, crowded, cozy, family_friendly
@@ -71,8 +72,9 @@ limited_parking, crowded_evening, slow_service, noise, high_price, limited_seati
 
 timeContext:
 morning, afternoon, evening, late_night
-        `.trim(),
-      },
+    `.trim(),
+
+    messages: [
       {
         role: "user",
         content: rawText,
@@ -80,13 +82,41 @@ morning, afternoon, evening, late_night
     ],
   });
 
-  let parsed: unknown;
+  const textBlock = response.content.find(
+    (block) => block.type === "text"
+  );
 
-  try {
-    parsed = JSON.parse(response.output_text);
-  } catch {
-    throw new Error("AI returned invalid JSON.");
+  if (!textBlock || textBlock.type !== "text") {
+    throw new Error("Claude returned no text output.");
   }
+
+function extractJson(text: string) {
+  const cleaned = text
+    .trim()
+    .replace(/^```json\s*/i, "")
+    .replace(/^```\s*/i, "")
+    .replace(/\s*```$/, "")
+    .trim();
+
+  const firstBrace = cleaned.indexOf("{");
+  const lastBrace = cleaned.lastIndexOf("}");
+
+  if (firstBrace === -1 || lastBrace === -1) {
+    throw new Error("No JSON object found in Claude response.");
+  }
+
+  return cleaned.slice(firstBrace, lastBrace + 1);
+}
+
+let parsed: unknown;
+
+try {
+  const jsonText = extractJson(textBlock.text);
+  parsed = JSON.parse(jsonText);
+} catch {
+  console.error("Claude raw output:", textBlock.text);
+  throw new Error("Claude returned invalid JSON.");
+}
 
   const validated = insightSchema.parse(parsed);
 

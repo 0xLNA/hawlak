@@ -1,5 +1,5 @@
 export const EXPERIENCE_MIN_LENGTH = 10;
-export const EXPERIENCE_MAX_LENGTH = 3000;
+export const EXPERIENCE_MAX_LENGTH = 500;
 export interface ExperienceInput { placeId: string; rawText: string }
 
 export function parseExperience(value: unknown): ExperienceInput | null {

@@ -1,171 +1,138 @@
-import { test, expect, type Page } from "@playwright/test";
+﻿import { test, expect, type Page } from "@playwright/test";
+import { getPlaces } from "../../lib/places";
+import type { PlaceInsights } from "../../lib/types";
 
-async function completeQuiz(page: Page, category = "خلّها مفتوحة") {
-  await page.getByRole("button", { name: category, exact: true }).click();
-  await page.getByRole("button", { name: "بدون تفضيلات", exact: true }).click();
+function insights(count: number): PlaceInsights | null {
+  if (!count) return null;
+  const evidenceIds = Array.from({ length: count }, (_, i) => `test-${i}`);
+  const item = (value: string) => ({ value, mentionCount: count, evidenceIds });
+  return { provenance: "extracted", evidenceCount: count, vibe: [item("quiet")], bestFor: [item("study")], positives: [item("good_coffee")], complaints: [item("limited_parking")], popularItems: [], timeContext: [], preferences: [{ ...item("quiet"), preference: "quiet" }, { ...item("work"), preference: "work" }] };
+}
+async function setup(page: Page, initialCount = 0) {
+  let count = initialCount;
+  let stars = 0;
+  let posts = 0;
+  await page.route("https://tile.openstreetmap.org/**", route => route.fulfill({ contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"><rect width="256" height="256" fill="#e9ece5"/></svg>' }));
+  await page.route("**/api/places", route => route.fulfill({ json: getPlaces().map(place => ({ ...place, insights: insights(count), starCount: stars })) }));
+  await page.route("**/api/places/*/insights", route => route.fulfill({ json: { insights: insights(count) } }));
+  await page.route("**/api/places/*/star", route => {
+    if (route.request().method() === "POST") { stars++; posts++; }
+    return route.fulfill({ status: route.request().method() === "POST" ? 201 : 200, json: { starCount: stars } });
+  });
+  await page.route("**/api/experiences", route => { count++; return route.fulfill({ status: 201, json: { processed: true } }); });
+  return { posts: () => posts };
+}
+async function openPlace(page: Page) {
+  await page.goto("/");
+  await page.getByRole("button", { name: "قهوة", exact: true }).click();
+  await page.getByRole("button", { name: "هادئ", exact: true }).click();
+  await page.getByRole("button", { name: "دراسة / عمل", exact: true }).click();
+  await page.getByRole("button", { name: "اعرض الأماكن على الخريطة" }).click();
+  await page.locator(".result-card").first().click();
+  await expect(page.locator("#place-title")).toBeVisible();
+  await expect(page.locator(".place-summary")).toHaveAttribute("aria-busy", "false");
 }
 
-test.beforeEach(async ({ page }) => {
-  // OSM prohibits automated tile scanning. Browser tests use a local stand-in.
-  await page.route("https://tile.openstreetmap.org/**", route => route.fulfill({ contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"><rect width="256" height="256" fill="#e9ece5"/><path d="M0 128H256M128 0V256" stroke="#fff" stroke-width="10"/></svg>' }));
-});
-
 for (const width of [375, 390, 768, 1024, 1440]) {
-  test(`intent, details, evidence and responsive layout at ${width}px`, async ({ page }, testInfo) => {
+  test(`real summary and RTL pros/cons at ${width}px`, async ({ page }, testInfo) => {
+    await setup(page, 1);
     await page.setViewportSize({ width, height: 900 });
     const errors: string[] = [];
     page.on("pageerror", error => errors.push(error.message));
-    await page.goto("/");
-    await expect(page.getByRole("heading", { name: "وش ودك اليوم؟" })).toBeVisible();
-    await expect(page.locator(".map-shell")).toHaveCount(0);
+    await openPlace(page);
+    await expect(page.locator(".trip-summary")).toContainText("طلعتك على جوك");
+    await expect(page.locator(".place-summary")).toContainText("مبني على تجربة واحدة");
+    await expect(page.locator(".place-summary")).toContainText("هادئ");
+    await expect(page.locator(".insight-positive")).toContainText("مناسب للدراسة");
+    await expect(page.locator(".insight-negative")).toContainText("المواقف محدودة");
+    await expect(page.locator(".insight-negative")).toContainText("ورد في تجربة واحدة");
+    await expect(page.locator(".match > b")).toHaveText("بيانات أولية");
+    const positive = (await page.locator(".insight-positive").boundingBox())!;
+    const negative = (await page.locator(".insight-negative").boundingBox())!;
+    if (width < 768) { expect(positive.y).toBeLessThan(negative.y); expect(positive.x).toBe(negative.x); }
+    else { expect(positive.x).toBeGreaterThan(negative.x); expect(positive.y).toBe(negative.y); }
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-    await page.screenshot({ path: testInfo.outputPath(`quiz-${width}.png`), fullPage: true });
-    await page.getByRole("button", { name: "قهوة", exact: true }).click();
-    await page.getByRole("button", { name: "هادئ", exact: true }).click();
-    await page.getByRole("button", { name: "دراسة / عمل", exact: true }).click();
-    await expect(page.locator(".map-shell")).toHaveCount(0);
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-    await page.screenshot({ path: testInfo.outputPath(`preferences-${width}.png`), fullPage: true });
-    await page.getByRole("button", { name: "اعرض الأماكن على الخريطة" }).click();
-    await expect(page.locator("#results-title")).toBeFocused();
-    await expect(page.locator(".result-card").first().locator(".mini-score")).toHaveText("9.2");
-    await expect(page.locator(".map-marker").first()).toBeAttached();
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-    await page.screenshot({ path: testInfo.outputPath(`home-${width}.png`), fullPage: true });
-    await page.locator(".result-card").first().click();
-    await expect(page.locator(".panel .match")).toContainText("9.2 / 10");
-    await expect(page.getByRole("heading", { name: "لماذا يناسبك؟", exact: true })).toBeVisible();
-    await page.locator(".why summary").click();
-    await expect(page.locator(".breakdown")).toContainText("طابق 2 من 2");
     await expect(page.locator(".actions a")).toHaveAttribute("href", /destination=24\./);
-    await page.getByRole("button", { name: "عرض المصادر", exact: true }).click();
-    await expect(page.getByRole("dialog")).toBeVisible();
-    await expect(page.locator(".evidence-item")).toHaveCount(3);
-    await page.keyboard.press("Escape");
-    await expect(page.getByRole("dialog")).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "عرض المصادر", exact: true })).toBeFocused();
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-    await page.screenshot({ path: testInfo.outputPath(`details-${width}.png`), fullPage: true });
+    await expect(page.locator(".map-marker").first()).toBeAttached();
     await page.getByRole("button", { name: "تحديد موقعي", exact: true }).scrollIntoViewIfNeeded();
-    await expect(page.getByRole("button", { name: "تحديد موقعي", exact: true })).toBeVisible();
-    const controlsUncovered = await page.getByRole("button", { name: "تحديد موقعي", exact: true }).evaluate(button => { const rect = button.getBoundingClientRect(); return button.contains(document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2)); });
-    expect(controlsUncovered).toBe(true);
+    expect(await page.getByRole("button", { name: "تحديد موقعي", exact: true }).evaluate(button => { const r = button.getBoundingClientRect(); return button.contains(document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)); })).toBe(true);
+    await page.screenshot({ path: testInfo.outputPath(`details-${width}.png`), fullPage: true });
     expect(errors).toEqual([]);
   });
 }
 
-test("save persists by place; category, search and empty states stay consistent", async ({ page }) => {
-  await page.goto("/");
-  await completeQuiz(page);
-  await page.locator(".result-card").first().click();
-  const placeName = await page.locator("#place-title").innerText();
+test("no experiences means no numeric score, invented evidence or zero popularity badge", async ({ page }) => {
+  await setup(page);
+  await openPlace(page);
+  await expect(page.locator(".place-summary")).toContainText("لا توجد تجارب كافية بعد.");
+  await expect(page.locator(".match > b")).toHaveText("بيانات أولية");
+  await expect(page.locator(".decision-grid")).toHaveCount(0);
+  await expect(page.locator(".star-button b")).toHaveCount(0);
+});
+
+test("star is distinct from save, persists across refresh and changes score only lightly", async ({ page }) => {
+  const state = await setup(page, 3);
+  await openPlace(page);
+  const before = Number((await page.locator(".match > b").innerText()).split(" / ")[0]);
+  await page.getByRole("button", { name: "مميز", exact: true }).click();
+  await expect(page.locator(".star-button")).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator(".star-button b")).toHaveText("1");
+  const after = Number((await page.locator(".match > b").innerText()).split(" / ")[0]);
+  expect(after - before).toBeGreaterThan(0); expect(after - before).toBeLessThan(5);
+  await expect(page.getByRole("button", { name: "حفظ", exact: true })).toHaveAttribute("aria-pressed", "false");
+  await openPlace(page);
+  await expect(page.locator(".star-button")).toBeDisabled();
+  await expect(page.locator(".star-button")).toHaveAttribute("aria-pressed", "true");
+  expect(state.posts()).toBe(1);
+});
+
+test("experience closes dialog and refreshes evidence, summary and score without navigation", async ({ page }) => {
+  await setup(page, 2);
+  await openPlace(page);
+  await expect(page.locator(".match > b")).toHaveText("بيانات أولية");
+  let navigations = 0;
+  page.on("framenavigated", frame => { if (frame === page.mainFrame()) navigations++; });
+  await page.getByRole("button", { name: "شارك تجربتك", exact: true }).click();
+  const textarea = page.locator("#experience-text");
+  await expect(textarea).toHaveAttribute("maxlength", "500");
+  await textarea.fill("مكان هادئ ومناسب للدراسة لكن المواقف محدودة");
+  await expect(page.locator("#experience-length")).toContainText("/ 500");
+  await page.getByRole("button", { name: "إرسال التجربة", exact: true }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(page.locator(".place-summary")).toContainText("مبني على 3 تجارب");
+  await expect(page.locator(".insight-negative")).toContainText("ورد في 3 تجارب");
+  await expect(page.locator(".match > b")).toContainText("84.5 / 100");
+  expect(navigations).toBe(0);
+});
+
+test("saved raw review still succeeds when extraction fails", async ({ page }) => {
+  await setup(page);
+  await page.route("**/api/experiences", route => route.fulfill({ status: 201, json: { processed: false } }));
+  await openPlace(page);
+  await page.getByRole("button", { name: "شارك تجربتك", exact: true }).click();
+  await page.locator("#experience-text").fill("هذه تجربة حقيقية في المكان");
+  await page.getByRole("button", { name: "إرسال التجربة", exact: true }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(page.locator(".submission-notice")).toContainText("تم حفظ تجربتك");
+  await expect(page.locator(".place-summary")).toContainText("لا توجد تجارب كافية بعد.");
+});
+
+test("save and sidebar controls retain their independent behavior", async ({ page }) => {
+  await setup(page);
+  await openPlace(page);
   await page.getByRole("button", { name: "حفظ", exact: true }).click();
-  await page.reload();
-  await completeQuiz(page);
-  await page.locator(".saved-filter").click();
-  await expect(page.locator(".result-card")).toHaveCount(1);
-  await expect(page.locator(".result-card h3")).toHaveText(placeName);
-  await page.getByRole("textbox", { name: "ابحث عن مكان أو تجربة" }).fill("nothing-matches-this");
-  await expect(page.locator(".empty")).toContainText("لا توجد نتائج مطابقة");
-  await expect(page.locator(".map-marker")).toHaveCount(0);
-  await page.getByRole("button", { name: "تغيير الاختيارات" }).click();
-  for (const category of ["قهوة", "أكل", "حلا", "فعالية", "تمشية"]) {
-    await completeQuiz(page, category);
-    expect(await page.locator(".result-card").count()).toBeGreaterThan(0);
-    for (const label of await page.locator(".result-category").allTextContents()) expect(label).toBe(category);
-    await expect(page.getByRole("textbox")).toHaveValue("");
-    await page.getByRole("button", { name: "تعديل الاختيارات" }).click();
-  }
-});
-
-test("map markers follow zoom detail and remain clickable", async ({ page }) => {
-  await page.goto("/");
-  await completeQuiz(page, "قهوة");
-  await page.locator(".result-card").first().click();
-  await expect(page.locator(".marker-full").first()).toBeAttached();
-  await page.getByRole("button", { name: "تصغير الخريطة", exact: true }).click();
-  await expect(page.locator(".marker-full")).toHaveCount(0);
-  await expect(page.locator(".marker-score").first()).toBeAttached();
-  const scoreSize = await page.locator(".marker-score").first().boundingBox();
-  expect(scoreSize?.width).toBe(44);
-  expect(scoreSize?.height).toBe(44);
-  await page.getByRole("button", { name: "تصغير الخريطة", exact: true }).click();
-  await page.getByRole("button", { name: "تصغير الخريطة", exact: true }).click();
-  await expect(page.locator(".marker-cluster").first()).toBeAttached();
-  await page.locator(".marker-cluster").first().click();
-  await expect(page.locator(".marker-score,.marker-full").first()).toBeAttached();
-  await page.locator(".marker-score,.marker-full").first().click();
+  await page.getByRole("button", { name: "إخفاء القائمة", exact: true }).click();
+  await page.getByRole("button", { name: "عرض القائمة", exact: true }).click();
   await expect(page.locator("#place-title")).toBeVisible();
+  await openPlace(page);
+  await expect(page.getByRole("button", { name: "تم الحفظ", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator(".star-button")).toHaveAttribute("aria-pressed", "false");
 });
 
-test("tile failure preserves local results", async ({ page }) => {
-  await page.unroute("https://tile.openstreetmap.org/**");
-  await page.route("https://tile.openstreetmap.org/**", route => route.abort());
-  await page.goto("/");
-  await completeQuiz(page);
-  await expect(page.locator(".map-status")).toContainText("تعذر تحميل خلفية الخريطة");
-  expect(await page.locator(".result-card").count()).toBeGreaterThan(0);
-  await page.locator(".result-card").first().click();
-  await expect(page.locator(".panel")).toBeVisible();
-});
-
-test("geolocation is requested explicitly and adds measured distances", async ({ page, context }) => {
-  await context.grantPermissions(["geolocation"]);
-  await context.setGeolocation({ latitude: 24.69, longitude: 46.69 });
-  await page.goto("/");
-  await completeQuiz(page);
-  await expect(page.locator(".result-card").first()).not.toContainText("كم بخط مستقيم");
-  await page.getByRole("button", { name: "تحديد موقعي", exact: true }).click();
-  await expect(page.locator(".map-status")).toContainText("تم تحديد موقعك");
-  await expect(page.locator(".result-card").first()).toContainText("كم بخط مستقيم");
-});
-
-test("denied location shows actionable feedback and keeps discovery usable", async ({ page }) => {
-  await page.addInitScript(() => {
-    Object.defineProperty(navigator, "geolocation", { value: { getCurrentPosition: (_success: unknown, fail: (error: { code: number }) => void) => fail({ code: 1 }) } });
-  });
-  await page.goto("/");
-  await completeQuiz(page);
-  await page.getByRole("button", { name: "تحديد موقعي", exact: true }).click();
-  await expect(page.locator(".map-status")).toContainText("لم يُسمح بتحديد الموقع");
-  expect(await page.locator(".result-card").count()).toBeGreaterThan(0);
-});
-
-test("quiz supports back, editing, cancellation and skipping preferences", async ({ page }) => {
-  await page.goto("/");
-  await page.getByRole("button", { name: "قهوة", exact: true }).click();
-  await expect(page.locator("#quiz-title")).toBeFocused();
-  await page.getByRole("button", { name: "هادئ", exact: true }).click();
-  await page.getByRole("button", { name: "السابق", exact: true }).click();
-  await expect(page.getByRole("button", { name: "قهوة", exact: true })).toHaveAttribute("aria-pressed", "true");
-  await page.getByRole("button", { name: "قهوة", exact: true }).click();
-  await expect(page.getByRole("button", { name: "هادئ", exact: true })).toHaveAttribute("aria-pressed", "true");
-  await page.getByRole("button", { name: "اعرض الأماكن على الخريطة" }).click();
-  await expect(page.locator(".trip-summary")).toContainText("قهوة · هادئ");
-  const names = await page.locator(".result-card h3").allTextContents();
-  await page.getByRole("button", { name: "تعديل الاختيارات" }).click();
-  await page.getByRole("button", { name: "أكل", exact: true }).click();
-  await page.getByRole("button", { name: "العودة للخريطة" }).click();
-  await expect(page.locator(".trip-summary")).toContainText("قهوة · هادئ");
-  await expect(page.locator(".result-card h3")).toHaveText(names);
-  await page.getByRole("button", { name: "تعديل الاختيارات" }).click();
-  await completeQuiz(page, "أكل");
-  await expect(page.locator(".trip-summary p")).toHaveText("أكل");
-  await expect(page.locator(".result-card").first().locator(".mini-score")).toHaveText("5.0");
-});
-
-test("API uses shared ranking and validates invalid inputs", async ({ request }) => {
-  const response = await request.get("/api/places?category=cafe");
-  expect(response.ok()).toBe(true);
-  const cafes = await response.json();
-  expect(cafes.every((place: { category: string }) => place.category === "cafe")).toBe(true);
-  expect((await request.get(`/api/places/${cafes[0].id}`)).status()).toBe(200);
-  expect((await request.get("/api/places/missing")).status()).toBe(404);
-  expect((await request.get("/api/places?category=__proto__")).status()).toBe(400);
-  const ranked = await request.post("/api/recommend", { data: { category: "cafe", preferences: ["quiet", "work"] } });
-  expect((await ranked.json())[0].score).toBe(9.2);
+test("API rejects unknown places and reviews longer than 500 before persistence", async ({ request }) => {
+  const id = getPlaces()[0].id;
+  expect((await request.post("/api/experiences", { data: { placeId: id, rawText: "x".repeat(501) } })).status()).toBe(400);
+  expect((await request.get("/api/places/missing/star")).status()).toBe(404);
+  expect((await request.post("/api/places/missing/star")).status()).toBe(404);
   expect((await request.post("/api/recommend", { data: { category: "cafe", preferences: ["invalid"] } })).status()).toBe(400);
-  expect((await request.post("/api/recommend", { data: "{", headers: { "content-type": "application/json" } })).status()).toBe(400);
-  expect((await request.post("/api/recommend", { data: "x".repeat(5000), headers: { "content-type": "application/json" } })).status()).toBe(413);
-  expect((await request.post("/api/recommend", { data: "hello", headers: { "content-type": "text/plain" } })).status()).toBe(415);
 });

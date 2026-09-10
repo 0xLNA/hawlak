@@ -35,6 +35,7 @@ export interface PlaceInsights {
   positives: InsightItem[];
   complaints: InsightItem[];
   popularItems: InsightItem[];
+  timeContext: InsightItem[];
   preferences: PreferenceInsight[];
   /** Distinct source experiences, never a popularity or visitor count. */
   evidenceCount: number;
@@ -49,7 +50,7 @@ export interface ExperienceExtraction {
   provenance: "demo" | "extracted";
   observations: { section: "vibe" | "bestFor" | "positives" | "complaints" | "popularItems"; value: string; preference?: Preference }[];
 }
-export interface PlaceRecord extends Place { insights: PlaceInsights | null }
+export interface PlaceRecord extends Place { insights: PlaceInsights | null; starCount?: number }
 export interface Recommendation {
   placeId: string;
   isPrimary: boolean;
@@ -57,7 +58,9 @@ export interface Recommendation {
   matchedPreferences: Preference[];
   unconfirmedPreferences: Preference[];
   explanation: string;
-  /** Inputs for future deterministic ranking/confidence; no invented numerical score. */
-  signals: { categoryMatch: boolean; preferenceMatchCount: number; requestedPreferenceCount: number; evidenceCount: number };
+  /** Request match, never a business rating; withheld below three experiences. */
+  score: number | null;
+  rankingScore: number;
+  signals: { categoryMatch: boolean; preferenceMatchCount: number; requestedPreferenceCount: number; evidenceCount: number; starCount: number };
 }
 export interface RankedPlace { place: PlaceRecord; recommendation: Recommendation }

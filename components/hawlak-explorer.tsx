@@ -12,7 +12,21 @@ import OutingQuiz from "./outing-quiz";
 const PlaceMap = dynamic(() => import("./place-map"), { ssr: false, loading: () => <div className="map-loading" role="status">جارٍ تجهيز خريطة حولك…</div> });
 const normalize = (text: string) => text.toLowerCase().normalize("NFKC").replace(/[\u064B-\u065F\u0670\u0640]/g, "").replace(/[أإآ]/g, "ا").trim();
 
-export default function HawlakExplorer({ places }: { places: PlaceRecord[] }) {
+export default function HawlakExplorer({ places: initialPlaces }: { places: PlaceRecord[] }) {
+  const [places, setPlaces] = useState(initialPlaces);
+  const updatedPlaces = useRef(new Set<string>());
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch("/api/places", { cache: "no-store", signal: controller.signal })
+      .then(response => { if (!response.ok) throw new Error("Places unavailable"); return response.json(); })
+      .then((data: PlaceRecord[]) => setPlaces(current => current.map(place => updatedPlaces.current.has(place.id) ? place : data.find(item => item.id === place.id) ?? place)))
+      .catch(() => { /* Metadata remains available when offline. */ });
+    return () => controller.abort();
+  }, []);
+  const updatePlace = useCallback((id: string, updates: Partial<Pick<PlaceRecord, "insights" | "starCount">>) => {
+    updatedPlaces.current.add(id);
+    setPlaces(current => current.map(place => place.id === id ? { ...place, ...updates } : place));
+  }, []);
   const [intent, setIntent] = useState<IntentProfile>({ category: "all", preferences: [] });
   const [quizOpen, setQuizOpen] = useState(true);
   const [hasCompletedQuiz, setHasCompletedQuiz] = useState(false);
@@ -32,7 +46,7 @@ export default function HawlakExplorer({ places }: { places: PlaceRecord[] }) {
       const stored: unknown = JSON.parse(localStorage.getItem("hawlak:saved:v1") || "[]");
       if (Array.isArray(stored)) setSavedIds(stored.filter((id): id is string => typeof id === "string" && places.some(place => place.id === id)));
     } catch { setStorageStatus("تعذر قراءة المحفوظات؛ يمكنك الحفظ لهذه الجلسة."); }
-  }, [places]);
+  }, [initialPlaces]);
   const recommendations = useMemo(() => recommend(places, intent), [places, intent]);
   const results = useMemo(() => {
     const byId = new Map(places.map(place => [place.id, place]));
@@ -77,14 +91,14 @@ export default function HawlakExplorer({ places }: { places: PlaceRecord[] }) {
       {!quizOpen && <button className={`saved-filter ${savedOnly ? "active" : ""}`} aria-pressed={savedOnly} onClick={() => { setSavedOnly(!savedOnly); setSelectedId(null); }}><Bookmark size={18}/><span>المحفوظات</span><b>{savedIds.length}</b></button>}
     </header>
     {quizOpen ? <OutingQuiz initialIntent={intent} onComplete={finishQuiz} onCancel={hasCompletedQuiz ? () => setQuizOpen(false) : undefined}/> : <>
-      <section className="trip-summary" aria-label="اختيارات طلعتك"><div><b>طلعتك على ذوقك</b><p>{[categoryLabels[intent.category], ...intent.preferences.map(pref => preferenceLabels[pref])].join(" · ")}</p></div><button onClick={editChoices}><SlidersHorizontal size={17}/> تعديل الاختيارات</button></section>
+      <section className="trip-summary" aria-label="اختيارات طلعتك"><div><b>طلعتك على جوك</b><p>{[categoryLabels[intent.category], ...intent.preferences.map(pref => preferenceLabels[pref])].join(" · ")}</p></div><button onClick={editChoices}><SlidersHorizontal size={17}/> تعديل الاختيارات</button></section>
       <section className={`workspace ${sidebarOpen ? "" : "sidebar-collapsed"}`}>
         <div className="map-area">
           <PlaceMap results={results} selectedId={selected?.place.id ?? null} onSelect={select} onLocation={setLocation}/>
           {!sidebarOpen && <button ref={reopen} className="sidebar-reopen" onClick={restoreSidebar} aria-controls="map-sidebar" aria-expanded={false}><PanelRightOpen size={19}/> عرض القائمة</button>}
         </div>
         <div id="map-sidebar" className="map-sidebar" ref={sidebar} inert={!sidebarOpen} aria-hidden={!sidebarOpen}>
-          {selected ? <PlaceDetails key={selected.place.id} result={selected} distance={location ? distanceKm(location, [selected.place.latitude, selected.place.longitude]) : undefined} saved={savedIds.includes(selected.place.id)} onSave={() => save(selected.place.id)} onCollapse={collapseSidebar} onClose={() => { setSelectedId(null); requestAnimationFrame(() => resultHeading.current?.focus({ preventScroll: true })); }}/> :
+          {selected ? <PlaceDetails key={selected.place.id} result={selected} onUpdate={updatePlace} distance={location ? distanceKm(location, [selected.place.latitude, selected.place.longitude]) : undefined} saved={savedIds.includes(selected.place.id)} onSave={() => save(selected.place.id)} onCollapse={collapseSidebar} onClose={() => { setSelectedId(null); requestAnimationFrame(() => resultHeading.current?.focus({ preventScroll: true })); }}/> :
             <aside className="results-panel" aria-labelledby="results-title">
               <div className="results-heading"><div><h2 ref={resultHeading} tabIndex={-1} id="results-title">أماكن لطلعتك</h2><p aria-live="polite">{primaryCount} من نوع طلعتك · {results.length - primaryCount} أماكن أخرى</p></div><button className="icon-button" onClick={collapseSidebar} aria-label="إخفاء القائمة" aria-controls="map-sidebar" aria-expanded={true}><PanelRightClose size={20}/></button></div>
               {intent.preferences.length > 0 && <p className="matching-note">نبدأ بنوع طلعتك. تأكيد تفضيلاتك يحتاج تجارب تدعمها.</p>}
