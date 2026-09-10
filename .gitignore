@@ -8,3 +8,4 @@ node_modules
 /playwright-report/
 /data/*.raw.json
 /data/runtime/
+.env*
