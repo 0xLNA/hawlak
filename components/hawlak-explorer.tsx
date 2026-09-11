@@ -2,17 +2,27 @@
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Bookmark, Compass, MapPin, Search, X, ArrowLeft, SlidersHorizontal, PanelRightClose, PanelRightOpen } from "lucide-react";
-import type { IntentProfile, PlaceRecord } from "../lib/types";
+import type { IntentProfile, PlaceInsights, PlaceRecord } from "../lib/types";
 import { categoryLabels, preferenceLabels } from "../lib/intent";
 import { recommend } from "../lib/recommend";
 import { distanceKm } from "../lib/geo";
 import PlaceDetails from "./place-details";
 import OutingQuiz from "./outing-quiz";
+import SocialVideoDemo from "./social-video-demo";
 
 const PlaceMap = dynamic(() => import("./place-map"), { ssr: false, loading: () => <div className="map-loading" role="status">جارٍ تجهيز خريطة حولك…</div> });
 const normalize = (text: string) => text.toLowerCase().normalize("NFKC").replace(/[\u064B-\u065F\u0670\u0640]/g, "").replace(/[أإآ]/g, "ا").trim();
 
-export default function HawlakExplorer({ places }: { places: PlaceRecord[] }) {
+export default function HawlakExplorer({ places: initialPlaces }: { places: PlaceRecord[] }) {
+  const [places, setPlaces] = useState(initialPlaces);
+  useEffect(() => { setPlaces(initialPlaces); }, [initialPlaces]);
+  const refreshInsights = useCallback(async (placeId: string) => {
+    const response = await fetch(`/api/places/${encodeURIComponent(placeId)}/insights`, { cache: "no-store" });
+    if (!response.ok) throw new Error("Failed to refresh place insights.");
+    const data: { placeId: string; insights: PlaceInsights | null } = await response.json();
+    if (data.placeId !== placeId || data.insights === undefined) throw new Error("Invalid place insights response.");
+    setPlaces(current => current.map(place => place.id === placeId ? { ...place, insights: data.insights } : place));
+  }, []);
   const [intent, setIntent] = useState<IntentProfile>({ category: "all", preferences: [] });
   const [screen, setScreen] = useState<"welcome" | "quiz" | "explore">("welcome");
   const quizOpen = screen === "quiz";
@@ -32,9 +42,9 @@ export default function HawlakExplorer({ places }: { places: PlaceRecord[] }) {
   useEffect(() => {
     try {
       const stored: unknown = JSON.parse(localStorage.getItem("hawlak:saved:v1") || "[]");
-      if (Array.isArray(stored)) setSavedIds(stored.filter((id): id is string => typeof id === "string" && places.some(place => place.id === id)));
+      if (Array.isArray(stored)) setSavedIds(stored.filter((id): id is string => typeof id === "string" && initialPlaces.some(place => place.id === id)));
     } catch { setStorageStatus("تعذر قراءة المحفوظات؛ يمكنك الحفظ لهذه الجلسة."); }
-  }, [places]);
+  }, [initialPlaces]);
   const recommendations = useMemo(() => recommend(places, intent), [places, intent]);
   const results = useMemo(() => {
     const byId = new Map(places.map(place => [place.id, place]));
@@ -49,6 +59,12 @@ export default function HawlakExplorer({ places }: { places: PlaceRecord[] }) {
   const browsingAll = intent.category === "all" && intent.preferences.length === 0;
   const selected = results.find(item => item.place.id === selectedId);
   const select = useCallback((id: string) => { setSelectedId(id); setSidebarOpen(true); }, []);
+  const socialDemoPlace = places.find(place => place.id === "osm-node-2530465471");
+  const showSocialPlace = (id: string) => {
+    // Reveal the matched place before using the normal card/marker selection path.
+    if (!results.some(item => item.place.id === id)) { setQuery(""); setSavedOnly(false); }
+    select(id);
+  };
   const save = (id: string) => {
     const next = savedIds.includes(id) ? savedIds.filter(item => item !== id) : [...savedIds, id];
     setSavedIds(next);
@@ -97,10 +113,11 @@ export default function HawlakExplorer({ places }: { places: PlaceRecord[] }) {
           </div>
         </div>
         <div id="map-sidebar" className="map-sidebar" ref={sidebar} inert={!sidebarOpen} aria-hidden={!sidebarOpen}>
-          {selected ? <PlaceDetails key={selected.place.id} result={selected} distance={location ? distanceKm(location, [selected.place.latitude, selected.place.longitude]) : undefined} saved={savedIds.includes(selected.place.id)} onSave={() => save(selected.place.id)} onCollapse={collapseSidebar} onClose={() => { setSelectedId(null); requestAnimationFrame(() => resultHeading.current?.focus({ preventScroll: true })); }}/> :
+          {selected ? <PlaceDetails key={selected.place.id} result={selected} distance={location ? distanceKm(location, [selected.place.latitude, selected.place.longitude]) : undefined} saved={savedIds.includes(selected.place.id)} onSave={() => save(selected.place.id)} onRefreshInsights={refreshInsights} onCollapse={collapseSidebar} onClose={() => { setSelectedId(null); requestAnimationFrame(() => resultHeading.current?.focus({ preventScroll: true })); }}/> :
             <aside className="results-panel" aria-labelledby="results-title">
               <div className="results-heading"><div><h2 ref={resultHeading} tabIndex={-1} id="results-title">{browsingAll ? "أماكن للاستكشاف" : "أماكن لطلعتك"}</h2><p aria-live="polite">{browsingAll ? `${results.length} أماكن متاحة` : `${primaryCount} من نوع طلعتك · ${results.length - primaryCount} أماكن أخرى`}</p></div><button className="icon-button" onClick={collapseSidebar} aria-label="إخفاء القائمة" aria-controls="map-sidebar" aria-expanded={true}><PanelRightClose size={20}/></button></div>
               <div className="results-list">
+                {socialDemoPlace && <SocialVideoDemo place={socialDemoPlace} onSelect={showSocialPlace}/>}
                 {results.map(({ place, recommendation }) => <button className="result-card" data-category={place.category} key={place.id} onClick={() => select(place.id)}>
                   <div className="result-top"><span className="result-category">{categoryLabels[place.category]}</span>{recommendation.isPrimary ? <MapPin size={18} aria-label="من نوع طلعتك"/> : <span className="other-indicator" aria-label="مكان آخر"/>}</div>
                   <h3>{place.name}</h3>

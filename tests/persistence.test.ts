@@ -4,6 +4,7 @@ import { GET, POST } from "../app/api/places/[id]/star/route";
 import { POST as submitExperience } from "../app/api/experiences/route";
 import { getAggregatedPlaceInsights } from "../lib/aggregated-insights";
 import { getPlaces } from "../lib/places";
+import { withLiveSignals } from "../lib/live-places";
 
 test("server persists real stars, counts only stars and preserves reviews on extraction failure", async () => {
   const previousFetch = globalThis.fetch;
@@ -19,11 +20,13 @@ test("server persists real stars, counts only stars and preserves reviews on ext
   const reviews: Record<string, unknown>[] = [];
   let failCount = false;
   let failInsert = false;
+  let starRequests = 0;
   globalThis.fetch = async (input, options) => {
     const request = new Request(input, options);
     const url = new URL(request.url);
     assert.equal(url.origin, "https://database.example.test");
     if (url.pathname.endsWith("/place_signals")) {
+      starRequests++;
       if (request.method === "POST") {
         if (failInsert) return Response.json({ message: "unavailable" }, { status: 503 });
         const signal = await request.json();
@@ -76,6 +79,13 @@ test("server persists real stars, counts only stars and preserves reviews on ext
     assert.equal(insights?.evidenceCount, 1);
     assert.equal(insights?.provenance, "extracted");
     assert.equal(insights?.preferences.find(item => item.preference === "work")?.mentionCount, 1);
+    // The home page loads real evidence without reading backend star signals.
+    const previousStarRequests = starRequests;
+    const livePlaces = await withLiveSignals(getPlaces(), { includeStars: false });
+    assert.equal(starRequests, previousStarRequests);
+    assert.deepEqual(livePlaces.find(place => place.id === placeId)?.insights, insights);
+    assert.ok(livePlaces.every(place => place.starCount === undefined));
+    assert.ok(livePlaces.filter(place => place.id !== placeId).every(place => place.insights === null));
     const response = await submitExperience(new Request("http://localhost/api/experiences", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ placeId, rawText: "A real review kept even without extraction." }) }));
     assert.equal(response.status, 201);
     assert.equal((await response.json()).processed, false);

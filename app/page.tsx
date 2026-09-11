@@ -1,6 +1,10 @@
 import HawlakExplorer from "../components/hawlak-explorer";
 import { getPlaces } from "../lib/places";
+import { withLiveSignals } from "../lib/live-places";
 
-export default function Home() {
-  return <HawlakExplorer places={getPlaces()}/>;
+export const dynamic = "force-dynamic";
+
+export default async function Home() {
+  const places = await withLiveSignals(getPlaces(), { includeStars: false });
+  return <HawlakExplorer places={places}/>;
 }
