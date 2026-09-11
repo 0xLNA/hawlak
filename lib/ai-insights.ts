@@ -16,6 +16,18 @@ function normalize(values: string[]) {
   return [...new Set(values.map((value) => value.trim()).filter(Boolean))];
 }
 
+function extractJson(text: string) {
+  const cleaned = text.replace(/```json/gi, "").replace(/```/g, "").trim();
+  const start = cleaned.indexOf("{");
+  const end = cleaned.lastIndexOf("}");
+
+  if (start === -1 || end < start) {
+    throw new Error("Claude returned invalid JSON.");
+  }
+
+  return cleaned.slice(start, end + 1);
+}
+
 export async function extractReviewInsights(
   rawText: string
 ): Promise<ExtractedReviewInsights> {
@@ -25,14 +37,11 @@ export async function extractReviewInsights(
     throw new Error("ANTHROPIC_API_KEY is missing.");
   }
 
-  const client = new Anthropic({
-    apiKey,
-  });
+  const client = new Anthropic({ apiKey });
 
   const response = await client.messages.create({
     model: "claude-sonnet-5",
     max_tokens: 600,
-
     system: `
 You extract structured place insights from Arabic or English user experiences.
 
@@ -73,7 +82,6 @@ limited_parking, crowded_evening, slow_service, noise, high_price, limited_seati
 timeContext:
 morning, afternoon, evening, late_night
     `.trim(),
-
     messages: [
       {
         role: "user",
@@ -82,41 +90,22 @@ morning, afternoon, evening, late_night
     ],
   });
 
-  const textBlock = response.content.find(
-    (block) => block.type === "text"
-  );
+  const text = response.content
+    .filter((block) => block.type === "text")
+    .map((block) => block.text)
+    .join("\n");
 
-  if (!textBlock || textBlock.type !== "text") {
+  if (!text.trim()) {
     throw new Error("Claude returned no text output.");
   }
 
-function extractJson(text: string) {
-  const cleaned = text
-    .trim()
-    .replace(/^```json\s*/i, "")
-    .replace(/^```\s*/i, "")
-    .replace(/\s*```$/, "")
-    .trim();
+  let parsed: unknown;
 
-  const firstBrace = cleaned.indexOf("{");
-  const lastBrace = cleaned.lastIndexOf("}");
-
-  if (firstBrace === -1 || lastBrace === -1) {
-    throw new Error("No JSON object found in Claude response.");
+  try {
+    parsed = JSON.parse(extractJson(text));
+  } catch {
+    throw new Error("Claude returned invalid JSON.");
   }
-
-  return cleaned.slice(firstBrace, lastBrace + 1);
-}
-
-let parsed: unknown;
-
-try {
-  const jsonText = extractJson(textBlock.text);
-  parsed = JSON.parse(jsonText);
-} catch {
-  console.error("Claude raw output:", textBlock.text);
-  throw new Error("Claude returned invalid JSON.");
-}
 
   const validated = insightSchema.parse(parsed);
 

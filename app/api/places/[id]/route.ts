@@ -1,8 +1,25 @@
 import { NextResponse } from "next/server";
-import { getPlace } from "../../../../lib/places";
+import { getAggregatedPlaceInsights } from "@/lib/aggregated-insights";
 
-export async function GET(_request: Request, context: { params: Promise<{ id: string }> }) {
-  const { id } = await context.params;
-  const place = getPlace(id);
-  return place ? NextResponse.json(place) : NextResponse.json({ error: "Place not found" }, { status: 404 });
+export async function GET(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+
+    const insights = await getAggregatedPlaceInsights(id);
+
+    return NextResponse.json({
+      placeId: id,
+      insights,
+    });
+  } catch (error) {
+    console.error("GET place insights:", error);
+
+    return NextResponse.json(
+      { error: "Failed to load place insights." },
+      { status: 500 }
+    );
+  }
 }

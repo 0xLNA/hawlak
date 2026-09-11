@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
-import { LocateFixed, Maximize, MapPin, Circle } from "lucide-react";
+import { LocateFixed, Maximize, MapPin, Circle, Shuffle, LoaderCircle } from "lucide-react";
 import { clusterPoints, createMarkerButton, markerDetail } from "../lib/map-markers";
 import type { RankedPlace } from "../lib/types";
 
@@ -87,7 +87,9 @@ export default function PlaceMap({ results, selectedId, onSelect, onLocation }: 
         const selected = first.place.id === selectedId;
         const full = !clustered && (selected || first.recommendation.isPrimary) && detail === "full" && !labelPositions.some(point => Math.abs(point.x - first.x) < 190 && Math.abs(point.y - first.y) < 54);
         if (full) labelPositions.push(first);
-        const button = createMarkerButton({ name: first.place.name, primary: first.recommendation.isPrimary, selected, detail, showLabel: full, count: group.length });
+        const button = createMarkerButton({ name: first.place.name, category: first.place.category, primary: first.recommendation.isPrimary, selected, detail, showLabel: full, count: group.length });
+        // A cluster may include several categories, so keep its color neutral.
+        if (clustered && group.some(item => item.place.category !== first.place.category)) delete button.dataset.category;
         button.dataset.placeId = first.place.id;
         const latitude = group.reduce((sum, item) => sum + item.place.latitude, 0) / group.length;
         const longitude = group.reduce((sum, item) => sum + item.place.longitude, 0) / group.length;
@@ -129,10 +131,19 @@ export default function PlaceMap({ results, selectedId, onSelect, onLocation }: 
     }, error => { setLocating(false); setLocationStatus(error.code === 1 ? "لم يُسمح بتحديد الموقع. يمكنك تصفح أماكن الرياض." : "تعذر تحديد موقعك. حاول مرة أخرى."); }, { timeout: 10000, maximumAge: 60000 });
   };
 
+  const pickPlace = () => {
+    const primary = results.filter(item => item.recommendation.isPrimary);
+    const pool = primary.length ? primary : results;
+    const alternatives = pool.filter(item => item.place.id !== selectedId);
+    const choices = alternatives.length ? alternatives : pool;
+    if (choices.length) onSelect(choices[Math.floor(Math.random() * choices.length)].place.id);
+  };
+
   return <div className="map-shell">
     <div ref={container} className="map" aria-label="خريطة أماكن الرياض" />
-    <div className="map-tools"><button onClick={locate} disabled={locating} aria-label="تحديد موقعي"><LocateFixed size={18} /></button><button aria-label="عرض جميع النتائج على الخريطة" disabled={!results.length} onClick={() => { const map = mapRef.current; if (map) map.fitBounds(L.latLngBounds(results.map(({ place }) => L.latLng(place.latitude, place.longitude))), { padding: [55, 55], maxZoom: 14 }); }}><Maximize size={18} /></button></div>
-    <div className="map-legend" aria-label="دليل رموز الخريطة"><span><MapPin size={18}/> من نوع طلعتك</span><span><Circle size={11}/> أماكن أخرى</span><small>{results.length} أماكن متاحة</small></div>
+    <div className="map-welcome"><button onClick={pickPlace} disabled={!ready || !results.length}><Shuffle size={16}/><span>اختار لي</span></button></div>
+    <div className="map-tools" role="group" aria-label="أدوات الخريطة"><button onClick={locate} disabled={!ready || locating} aria-label="تحديد موقعي" title="تحديد موقعي">{locating ? <LoaderCircle className="locating-spinner" size={18}/> : <LocateFixed size={18}/>}<span>موقعي</span></button><button aria-label="عرض جميع النتائج على الخريطة" title="عرض جميع النتائج على الخريطة" disabled={!ready || !results.length} onClick={() => { const map = mapRef.current; if (map) map.fitBounds(L.latLngBounds(results.map(({ place }) => L.latLng(place.latitude, place.longitude))), { padding: [75, 75], maxZoom: 14 }); }}><Maximize size={18}/><span>كل الأماكن</span></button></div>
+    <div className="map-legend" aria-label="دليل رموز الخريطة"><span><MapPin size={15}/> من نوع طلعتك</span><span><Circle size={9}/> أماكن أخرى</span></div>
     {(tileError || locationStatus) && <div className="map-status" role="status">{tileError ? "تعذر تحميل خلفية الخريطة. الأماكن والنتائج متاحة." : locationStatus}<button onClick={() => { setTileError(false); setLocationStatus(""); }} aria-label="إغلاق التنبيه">×</button></div>}
   </div>;
 }

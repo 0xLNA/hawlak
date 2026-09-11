@@ -1,4 +1,4 @@
-import type { ExperienceInput } from "./experience-input";
+ import type { ExperienceInput } from "./experience-input";
 import { getSupabaseServer } from "./supabase-server";
 
 export interface StoredExperience {
