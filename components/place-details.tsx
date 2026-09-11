@@ -9,8 +9,15 @@ import ExperienceDialog from "./experience-dialog";
 import PlaceStar from "./place-star";
 
 const categoryIcons = { cafe: Coffee, restaurant: Utensils, dessert: CakeSlice, activity: Sparkles, walk: Trees };
-function CategoryCover({ category }: { category: Category }) {
+const placeImages: Record<string, string> = {
+  starbucks: "/places/coffee1.jpg",
+  las: "/places/coffee2.jpg",
+  "las cafe": "/places/coffee2.jpg",
+  foam: "/places/coffee3.jpg",
+};
+function CategoryCover({ category, imageSrc }: { category: Category; imageSrc?: string }) {
   const Icon = categoryIcons[category];
+  if (imageSrc) return <div className="destination-cover" aria-hidden="true" style={{ position: "relative" }}><img src={imageSrc} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", borderRadius: "inherit" }}/></div>;
   return <div className="destination-cover" aria-hidden="true"><Icon size={48} strokeWidth={1.5}/><span>{categoryLabels[category]}</span></div>;
 }
 
@@ -42,7 +49,7 @@ export default function PlaceDetails({ result, distance, saved, onSave, onClose,
   return <aside className="panel" aria-labelledby="place-title">
     <div className="panel-top"><span><MapPin size={15}/> {categoryLabels[place.category]} · الرياض</span><div className="panel-controls"><button className="icon-button" onClick={onClose} aria-label="العودة إلى النتائج"><X size={20}/></button><button className="icon-button" onClick={onCollapse} aria-label="إخفاء القائمة" aria-controls="map-sidebar" aria-expanded={true}><PanelRightClose size={20}/></button></div></div>
     <div className="content">
-      <CategoryCover category={place.category}/>
+      <CategoryCover category={place.category} imageSrc={placeImages[place.name.trim().toLowerCase()] ?? placeImages[place.nameEn?.trim().toLowerCase() ?? ""]}/>
       <div className="heading"><div><h2 id="place-title" ref={title} tabIndex={-1} dir="auto">{place.name}</h2><p className="destination-meta">{categoryLabels[place.category]} · الرياض</p>{place.nameEn && place.nameEn !== place.name && <p className="english-name" dir="ltr">{place.nameEn}</p>}</div></div>
       <p className={`detail-match ${recommendation.isPrimary ? "primary" : ""}`}>{recommendation.isPrimary && <Check size={14}/>} {recommendation.basis === "preferences" ? "مناسب لطلبك" : recommendation.isPrimary ? "من نوع طلعتك" : "مكان آخر على الخريطة"}</p>
       <div className="facts">{distance !== undefined && Number.isFinite(distance) && <span><Navigation size={14}/>{distance.toFixed(1)} كم · خط مستقيم</span>}<PlaceStar placeId={place.id}/></div>
